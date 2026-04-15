@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./backend/temp:/app/temp
+    env_file:
+      - .env
+    depends_on:
+      - rembg
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '5173:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  rembg:
+    image: danielgatis/rembg:latest
+    command: s
+    ports:
+      - '7000:7000'
+    restart: unless-stopped
+
+  gfpgan:
+    build:
+      context: ./docker/gfpgan
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    environment:
+      - MODEL_PATH=/models/GFPGANv1.4.pth
+    volumes:
+      - gfpgan_models:/models
+    restart: unless-stopped
+    # Uncomment below to enable GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+  stable-diffusion:
+    # Using the AUTOMATIC1111 WebUI image — pull separately or build from source.
+    # See: https://github.com/AUTOMATIC1111/stable-diffusion-webui
+    image: ghcr.io/automatic1111/stable-diffusion-webui:latest
+    ports:
+      - '7860:7860'
+    volumes:
+      - sd_models:/models
+    command: ['--api', '--listen', '--no-half-vae']
+    restart: unless-stopped
+    profiles:
+      - gpu
+    # Uncomment below to enable GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+volumes:
+  gfpgan_models:
+  sd_models:
