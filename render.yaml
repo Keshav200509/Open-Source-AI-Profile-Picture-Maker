@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: ai-profile-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: NODE_ENV
+        value: production
+      - key: CLEANUP_INTERVAL_MS
+        value: 3600000
+      - key: MAX_FILE_SIZE_MB
+        value: 10
+      # Leave AI service URLs blank → runs in mock mode on free tier.
+      # Set these when you have a GPU-equipped server running the containers.
+      - key: REMBG_API_URL
+        value: ""
+      - key: GFPGAN_API_URL
+        value: ""
+      - key: STABLE_DIFFUSION_URL
+        value: ""
