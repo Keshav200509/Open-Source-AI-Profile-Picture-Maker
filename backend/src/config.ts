@@ -7,5 +7,5 @@ export const config = {
   stableDiffusionUrl: process.env.STABLE_DIFFUSION_URL || '',
   cleanupIntervalMs: parseInt(process.env.CLEANUP_INTERVAL_MS || '3600000', 10),
   maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10),
-  tempDir: path.join(__dirname, '../../temp'),
+  tempDir: path.join(__dirname, '../temp'),
 };

@@ -20,27 +20,37 @@ A self-hosted web application that transforms your selfie into professional or c
 | Storage    | Local filesystem (`temp/`) — no database |
 | Deploy     | Docker Compose |
 
-## Quick Start (Mock Mode — no GPU required)
+## Deploy to the Cloud (Recommended — no local setup needed)
+
+The app runs in **mock mode** on free cloud tiers (AI transformations return the original image after a 1-second delay). This is enough to test the full upload → transform → download flow. Real AI requires connecting a GPU server later.
+
+### Step 1 — Deploy backend to Render (free)
+
+1. Go to [render.com](https://render.com) → **New → Blueprint**
+2. Connect your GitHub repo — Render will pick up `render.yaml` automatically
+3. Click **Apply** — the backend deploys to `https://ai-profile-backend.onrender.com`
+4. Copy that URL
+
+### Step 2 — Deploy frontend to Vercel (free)
+
+1. Go to [vercel.com](https://vercel.com) → **New Project**
+2. Import the GitHub repo, set **Root Directory** to `frontend`
+3. Add environment variable:
+   ```
+   VITE_API_BASE_URL = https://ai-profile-backend.onrender.com
+   ```
+4. Click **Deploy** — the frontend is live at `https://your-project.vercel.app`
+
+That's it. No local installation needed.
+
+---
+
+## Local Development (optional)
 
 ```bash
-# Clone the repo
-git clone https://github.com/keshav200509/open-source-ai-profile-picture-maker.git
-cd open-source-ai-profile-picture-maker
-
-# Install backend dependencies
-cd backend && npm install && cd ..
-
-# Install frontend dependencies
-cd frontend && npm install && cd ..
-
-# Start backend (runs on :4000)
-cd backend && npm run dev &
-
-# Start frontend dev server (runs on :5173)
-cd frontend && npm run dev
+cd backend && npm install && npm run dev   # :4000
+cd frontend && npm install && npm run dev  # :5173
 ```
-
-Open http://localhost:5173 — all AI actions run in mock mode (1-second delay, returns the original image unchanged) when AI service URLs are not configured.
 
 ## Full Setup with Docker Compose (with GPU)
 
@@ -51,7 +61,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The frontend is served on port 5173, the backend on 4000. For GPU support, uncomment the `deploy.resources` sections in `docker-compose.yml`.
+For GPU support, uncomment the `deploy.resources` sections in `docker-compose.yml`.
 
 ## API Endpoints
 
