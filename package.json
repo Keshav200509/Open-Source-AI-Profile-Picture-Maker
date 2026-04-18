@@ -1,0 +1,13 @@
+{
+  "name": "ai-profile-picture-maker",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "postinstall": "cd backend && npm install && npm run build",
+    "start": "node backend/dist/server.js",
+    "build": "cd backend && npm install && npm run build"
+  }
+}
