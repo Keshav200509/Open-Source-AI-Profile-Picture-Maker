@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import axios from 'axios';
 import FormData from 'form-data';
 import sharp from 'sharp';
@@ -29,30 +28,17 @@ function getReplicate(): Replicate {
   return new Replicate({ auth: config.replicateApiToken });
 }
 
-// Calls HuggingFace Inference API for Real-ESRGAN (4× super-resolution).
-// Returns true on success, false on any failure so callers can fall through.
+// ─── HuggingFace Real-ESRGAN (Tier 1.5) ──────────────────────────────────────
+// Free 4× super-resolution. Returns true on success so callers fall through
+// to sharp on any failure — the HF free tier has cold-starts and queues.
+
 async function huggingFaceEnhance(inputPath: string, outputPath: string): Promise<boolean> {
   if (!config.hfApiToken) return false;
   try {
     const imageBuffer = fs.readFileSync(inputPath);
-    // First attempt — model may be cold-starting
-    let res = await axios.post(
-      'https://api-inference.huggingface.co/models/ai-forever/Real-ESRGAN',
-      imageBuffer,
-      {
-        headers: {
-          Authorization: `Bearer ${config.hfApiToken}`,
-          'Content-Type': 'application/octet-stream',
-        },
-        responseType: 'arraybuffer',
-        timeout: 30_000,
-        validateStatus: () => true,
-      },
-    );
-    // 503 means the model is loading — wait 20 s and retry once
-    if (res.status === 503) {
-      await new Promise((r) => setTimeout(r, 20_000));
-      res = await axios.post(
+
+    const attempt = async (timeoutMs: number) =>
+      axios.post(
         'https://api-inference.huggingface.co/models/ai-forever/Real-ESRGAN',
         imageBuffer,
         {
@@ -61,21 +47,29 @@ async function huggingFaceEnhance(inputPath: string, outputPath: string): Promis
             'Content-Type': 'application/octet-stream',
           },
           responseType: 'arraybuffer',
-          timeout: 90_000,
+          timeout: timeoutMs,
           validateStatus: () => true,
         },
       );
+
+    let res = await attempt(30_000);
+
+    // 503 = model cold-starting — wait 20 s then retry with a longer timeout
+    if (res.status === 503) {
+      await new Promise((r) => setTimeout(r, 20_000));
+      res = await attempt(90_000);
     }
-    if (res.status === 200) {
-      // HF returns the upscaled image; run it through sharp to cap size + normalise quality
-      const upscaled = await sharp(Buffer.from(res.data as ArrayBuffer))
-        .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 96 })
-        .toBuffer();
-      fs.writeFileSync(outputPath, upscaled);
-      return true;
-    }
-    return false;
+
+    if (res.status !== 200) return false;
+
+    // Cap at 2048 px and normalise quality before saving
+    const upscaled = await sharp(Buffer.from(res.data as ArrayBuffer))
+      .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 96 })
+      .toBuffer();
+
+    fs.writeFileSync(outputPath, upscaled);
+    return true;
   } catch {
     return false;
   }
@@ -84,7 +78,6 @@ async function huggingFaceEnhance(inputPath: string, outputPath: string): Promis
 // ─── Background Removal ───────────────────────────────────────────────────────
 
 export async function removeBackground(inputPath: string, outputPath: string): Promise<void> {
-  // Tier 1 — Replicate rembg (AI, cloud)
   if (config.replicateApiToken) {
     const buf = await toResizedBuffer(inputPath);
     const output = await getReplicate().run(
@@ -95,7 +88,6 @@ export async function removeBackground(inputPath: string, outputPath: string): P
     return;
   }
 
-  // Tier 2 — self-hosted rembg container
   if (config.rembgApiUrl) {
     const form = new FormData();
     form.append('file', fs.createReadStream(inputPath));
@@ -107,14 +99,13 @@ export async function removeBackground(inputPath: string, outputPath: string): P
     return;
   }
 
-  // Tier 3 — no AI: run the same punchy enhance so something visibly changes
   await sharpEnhance(inputPath, outputPath);
 }
 
 // ─── Face Enhancement ─────────────────────────────────────────────────────────
 
 export async function enhanceFace(inputPath: string, outputPath: string): Promise<void> {
-  // Tier 1 — Replicate GFPGAN (AI, cloud)
+  // Tier 1 — Replicate GFPGAN: full AI face restoration + 2× upscale
   if (config.replicateApiToken) {
     const buf = await toResizedBuffer(inputPath);
     const output = await getReplicate().run(
@@ -125,11 +116,10 @@ export async function enhanceFace(inputPath: string, outputPath: string): Promis
     return;
   }
 
-  // Tier 1.5 — HuggingFace Real-ESRGAN (free AI, 4× super-resolution)
-  const hfDone = await huggingFaceEnhance(inputPath, outputPath);
-  if (hfDone) return;
+  // Tier 1.5 — HuggingFace Real-ESRGAN: free 4× super-resolution
+  if (await huggingFaceEnhance(inputPath, outputPath)) return;
 
-  // Tier 2 — self-hosted GFPGAN container
+  // Tier 2 — self-hosted GFPGAN
   if (config.gfpganApiUrl) {
     const form = new FormData();
     form.append('image', fs.createReadStream(inputPath));
@@ -141,7 +131,7 @@ export async function enhanceFace(inputPath: string, outputPath: string): Promis
     return;
   }
 
-  // Tier 3 — aggressive sharp pipeline (always produces a visibly better result)
+  // Tier 3 — sharp (no AI required, always produces a clean result)
   await sharpEnhance(inputPath, outputPath);
 }
 
@@ -184,7 +174,6 @@ export async function applyStyle(
   style: StylePreset,
   customPrompt?: string,
 ): Promise<void> {
-  // Tier 1 — Replicate Stable Diffusion img2img (AI, cloud)
   if (config.replicateApiToken) {
     const buf = await toResizedBuffer(inputPath, 768);
     const preset = STYLE_PROMPTS[style];
@@ -205,7 +194,6 @@ export async function applyStyle(
     return;
   }
 
-  // Tier 2 — self-hosted Stable Diffusion WebUI
   if (config.stableDiffusionUrl) {
     const imageData = fs.readFileSync(inputPath).toString('base64');
     const preset = STYLE_PROMPTS[style];
@@ -226,51 +214,42 @@ export async function applyStyle(
     return;
   }
 
-  // Tier 3 — aggressive sharp colour grading (distinct, dramatic per style)
   await sharpStyle(inputPath, outputPath, style);
 }
 
-// ─── Sharp: Enhance Face (Tier 3) ────────────────────────────────────────────
-// Multi-pass pipeline designed to produce a clearly visible improvement on any
-// portrait photo: upscale → noise reduction → local contrast → sharpening →
-// tone curve → colour enrichment.
+// ─── Sharp Tier 3: Enhance Face ───────────────────────────────────────────────
+// Safe pipeline that always produces a clean, visibly improved result.
+// Rules: no per-channel histogram ops (cause false-colour), no double-pass
+// sharpening (halos), no linear() with untested offsets.
+//
+//  1. 1.5× Lanczos3 upscale   — larger output is itself a visible win
+//  2. normalize()             — global histogram stretch, hue-safe
+//  3. sharpen sigma 1.3       — visible crispness on face/hair/glasses
+//     m1 0.9 / m2 0.1        — aggressively sharpen flat regions (skin),
+//                               barely touch high-contrast edges (avoids
+//                               chromatic haloing at hair-background border)
+//  4. modulate sat 1.28       — +28 % saturation: clearly more vivid
+//  5. JPEG 96                 — near-lossless, no block recompression noise
 
 async function sharpEnhance(inputPath: string, outputPath: string): Promise<void> {
-  const meta = await sharp(inputPath).metadata();
-  const w = meta.width ?? 800;
-  const h = meta.height ?? 1000;
+  const { width: w = 800, height: h = 1000 } = await sharp(inputPath).metadata();
 
-  // Upscale 1.5× (capped at 2048 px on the long edge) so viewers immediately
-  // see a larger, crisper result — this alone signals "processing happened".
-  const scale = Math.min(1.5, 2048 / Math.max(w, h));
+  const scale  = Math.min(1.5, 2048 / Math.max(w, h));
   const targetW = Math.round(w * scale);
   const targetH = Math.round(h * scale);
 
   await sharp(inputPath)
-    // ① High-quality upscale
     .resize(targetW, targetH, { kernel: sharp.kernel.lanczos3, withoutEnlargement: false })
-    // ② Single-pixel median — kills sensor noise before sharpening amplifies it
-    .median(1)
-    // ③ CLAHE — local-area histogram equalisation makes buried details pop
-    //    without blowing out highlights (tiles × 4 = ~quarter-image chunks)
-    .clahe({ width: 4, height: 4, maxSlope: 3 })
-    // ④ Micro-detail pass: fine texture (sigma 0.5, strong flat/jagged ratio)
-    .sharpen({ sigma: 0.5, m1: 1.8, m2: 0.6 })
-    // ⑤ Structure pass: edge pop (sigma 2, lower weight so halos stay subtle)
-    .sharpen({ sigma: 2.0, m1: 0.4, m2: 0.15 })
-    // ⑥ Contrast S-curve: 1.06× gain, −0.025 shadow pull
-    .linear(1.06, -0.025)
-    // ⑦ Colour: +20 % saturation, slight warmth (+5° hue)
-    .modulate({ saturation: 1.2, brightness: 1.01, hue: 5 })
-    // ⑧ Near-lossless output
-    .jpeg({ quality: 97 })
+    .normalize()
+    .sharpen({ sigma: 1.3, m1: 0.9, m2: 0.1 })
+    .modulate({ saturation: 1.28, brightness: 1.03 })
+    .jpeg({ quality: 96 })
     .toFile(outputPath);
 }
 
-// ─── Sharp: Style Presets (Tier 3) ───────────────────────────────────────────
-// Each preset is tuned to look unmistakably different from the original and
-// from every other preset.  Values are deliberately bold — subtle changes at
-// this tier are invisible and misleading.
+// ─── Sharp Tier 3: Style Presets ─────────────────────────────────────────────
+// Each preset applies a strong but artefact-free colour grade.
+// Order matters: normalize before tint so the tint colour reads cleanly.
 
 async function sharpStyle(
   inputPath: string,
@@ -280,77 +259,70 @@ async function sharpStyle(
   let pipeline = sharp(inputPath);
 
   switch (style) {
-    // Cool, desaturated studio look. Crisp edges, corporate-blue tint.
+    // Cool studio: desaturate → crisp → cold blue-white tint
     case 'professional':
       pipeline = pipeline
-        .clahe({ width: 3, height: 3, maxSlope: 2 })
-        .modulate({ saturation: 0.75, brightness: 1.06 })
-        .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.4 })
-        .tint({ r: 210, g: 222, b: 245 })
-        .linear(1.1, -0.05);
+        .normalize()
+        .modulate({ saturation: 0.72, brightness: 1.08 })
+        .sharpen({ sigma: 1.1, m1: 0.9, m2: 0.2 })
+        .tint({ r: 205, g: 220, b: 248 });
       break;
 
-    // Warm golden-hour: lifted shadows, vibrant, slightly soft.
+    // Golden hour: warm, lifted, vibrant — feels like outdoor sunlight
     case 'casual':
       pipeline = pipeline
-        .modulate({ saturation: 1.55, brightness: 1.14 })
-        .tint({ r: 255, g: 242, b: 205 })
-        .sharpen({ sigma: 0.5 })
-        .linear(1.02, 0.04);
+        .modulate({ saturation: 1.6, brightness: 1.16 })
+        .tint({ r: 255, g: 240, b: 198 })
+        .sharpen({ sigma: 0.6 });
       break;
 
-    // Magical purple-blue: high saturation, dramatic shadows.
+    // Mystical: deep purple cast, high saturation, dark midtones
     case 'fantasy':
       pipeline = pipeline
-        .clahe({ width: 4, height: 4, maxSlope: 4 })
-        .modulate({ saturation: 1.85, brightness: 0.94 })
-        .tint({ r: 180, g: 162, b: 255 })
-        .linear(1.14, -0.06);
+        .normalize()
+        .modulate({ saturation: 2.0, brightness: 0.90 })
+        .tint({ r: 170, g: 150, b: 255 });
       break;
 
-    // Electric cyan neon, very high contrast, punchy shadows.
+    // Neon city: electric cyan, extreme saturation, deep shadows
     case 'cyberpunk':
       pipeline = pipeline
-        .modulate({ saturation: 2.6, brightness: 0.80 })
-        .tint({ r: 65, g: 190, b: 255 })
-        .sharpen({ sigma: 1.8, m1: 1.6, m2: 0.5 })
-        .linear(1.2, -0.09);
+        .modulate({ saturation: 2.5, brightness: 0.78 })
+        .tint({ r: 55, g: 185, b: 255 })
+        .sharpen({ sigma: 1.5, m1: 1.0, m2: 0.2 });
       break;
 
-    // Faded, soft, desaturated — lifted shadows, slight cool wash.
+    // Soft pastel: heavily desaturated, blurred, lifted — painted feel
     case 'watercolor':
       pipeline = pipeline
-        .modulate({ saturation: 0.48, brightness: 1.28 })
-        .blur(1.4)
-        .gamma(0.86)
-        .tint({ r: 248, g: 244, b: 255 })
-        .linear(0.9, 0.07);
+        .modulate({ saturation: 0.42, brightness: 1.30 })
+        .blur(1.6)
+        .gamma(0.85)
+        .tint({ r: 250, g: 246, b: 255 });
       break;
 
-    // Hyper-vivid, hard edges — cell-shaded cartoon feel.
+    // Cell-shaded: hyper-saturated, aggressive edge sharpening
     case 'anime':
       pipeline = pipeline
-        .clahe({ width: 6, height: 6, maxSlope: 5 })
-        .modulate({ saturation: 2.9, brightness: 1.13 })
-        .sharpen({ sigma: 2.8, m1: 2.4, m2: 0.2 })
-        .linear(1.13, -0.05);
+        .normalize()
+        .modulate({ saturation: 2.7, brightness: 1.12 })
+        .sharpen({ sigma: 2.2, m1: 2.0, m2: 0.15 });
       break;
 
-    // Warm amber/sienna, rich shadows, slight painterly blur.
+    // Old master: amber glaze, slight blur for paint texture, rich shadows
     case 'oil-painting':
       pipeline = pipeline
-        .modulate({ saturation: 1.45, brightness: 0.91 })
-        .blur(0.8)
-        .tint({ r: 255, g: 212, b: 148 })
-        .sharpen({ sigma: 0.6, m1: 0.5, m2: 0.2 })
-        .linear(1.14, -0.07);
+        .modulate({ saturation: 1.5, brightness: 0.89 })
+        .blur(0.9)
+        .tint({ r: 255, g: 208, b: 138 })
+        .sharpen({ sigma: 0.7, m1: 0.5, m2: 0.15 });
       break;
   }
 
-  await pipeline.jpeg({ quality: 93 }).toFile(outputPath);
+  await pipeline.jpeg({ quality: 94 }).toFile(outputPath);
 }
 
-// ─── Export processing mode for /api/mode endpoint ───────────────────────────
+// ─── Processing mode ──────────────────────────────────────────────────────────
 
 export function getProcessingMode(): 'replicate' | 'huggingface' | 'local' | 'sharp' {
   if (config.replicateApiToken) return 'replicate';
