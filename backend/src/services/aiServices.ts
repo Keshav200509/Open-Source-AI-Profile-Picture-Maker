@@ -231,39 +231,30 @@ export async function applyStyle(
 }
 
 // ─── Sharp: Enhance Face (Tier 3) ────────────────────────────────────────────
-// Multi-pass pipeline designed to produce a clearly visible improvement on any
-// portrait photo: upscale → noise reduction → local contrast → sharpening →
-// tone curve → colour enrichment.
+// Conservative pipeline: upscale → auto-levels → single sharpen → colour lift.
+// Goal is a clean, slightly crisper result — never to destroy the image.
+// CLAHE is intentionally absent: it operates per-channel on RGB causing
+// false-colour fringing on JPEG sources.  normalize() is channel-aware and safe.
 
 async function sharpEnhance(inputPath: string, outputPath: string): Promise<void> {
   const meta = await sharp(inputPath).metadata();
   const w = meta.width ?? 800;
   const h = meta.height ?? 1000;
 
-  // Upscale 1.5× (capped at 2048 px on the long edge) so viewers immediately
-  // see a larger, crisper result — this alone signals "processing happened".
+  // Upscale 1.5× (capped at 2048 px) — bigger output is itself an improvement
   const scale = Math.min(1.5, 2048 / Math.max(w, h));
   const targetW = Math.round(w * scale);
   const targetH = Math.round(h * scale);
 
   await sharp(inputPath)
-    // ① High-quality upscale
     .resize(targetW, targetH, { kernel: sharp.kernel.lanczos3, withoutEnlargement: false })
-    // ② Single-pixel median — kills sensor noise before sharpening amplifies it
-    .median(1)
-    // ③ CLAHE — local-area histogram equalisation makes buried details pop
-    //    without blowing out highlights (tiles × 4 = ~quarter-image chunks)
-    .clahe({ width: 4, height: 4, maxSlope: 3 })
-    // ④ Micro-detail pass: fine texture (sigma 0.5, strong flat/jagged ratio)
-    .sharpen({ sigma: 0.5, m1: 1.8, m2: 0.6 })
-    // ⑤ Structure pass: edge pop (sigma 2, lower weight so halos stay subtle)
-    .sharpen({ sigma: 2.0, m1: 0.4, m2: 0.15 })
-    // ⑥ Contrast S-curve: 1.06× gain, −0.025 shadow pull
-    .linear(1.06, -0.025)
-    // ⑦ Colour: +20 % saturation, slight warmth (+5° hue)
-    .modulate({ saturation: 1.2, brightness: 1.01, hue: 5 })
-    // ⑧ Near-lossless output
-    .jpeg({ quality: 97 })
+    // Global histogram stretch — safe, preserves hue relationships
+    .normalize()
+    // Single moderate sharpen — no halo amplification
+    .sharpen({ sigma: 0.9, m1: 0.6, m2: 0.2 })
+    // Gentle colour lift: +18 % saturation, +2 % brightness
+    .modulate({ saturation: 1.18, brightness: 1.02 })
+    .jpeg({ quality: 95 })
     .toFile(outputPath);
 }
 
@@ -280,70 +271,63 @@ async function sharpStyle(
   let pipeline = sharp(inputPath);
 
   switch (style) {
-    // Cool, desaturated studio look. Crisp edges, corporate-blue tint.
+    // Cool, desaturated studio look. Crisp, corporate-blue tint.
     case 'professional':
       pipeline = pipeline
-        .clahe({ width: 3, height: 3, maxSlope: 2 })
+        .normalize()
         .modulate({ saturation: 0.75, brightness: 1.06 })
-        .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.4 })
-        .tint({ r: 210, g: 222, b: 245 })
-        .linear(1.1, -0.05);
+        .sharpen({ sigma: 1.0, m1: 0.8, m2: 0.3 })
+        .tint({ r: 210, g: 222, b: 245 });
       break;
 
-    // Warm golden-hour: lifted shadows, vibrant, slightly soft.
+    // Warm golden-hour: vibrant, lifted, slightly soft.
     case 'casual':
       pipeline = pipeline
         .modulate({ saturation: 1.55, brightness: 1.14 })
         .tint({ r: 255, g: 242, b: 205 })
-        .sharpen({ sigma: 0.5 })
-        .linear(1.02, 0.04);
+        .sharpen({ sigma: 0.5 });
       break;
 
-    // Magical purple-blue: high saturation, dramatic shadows.
+    // Magical purple-blue: high saturation, slightly darker.
     case 'fantasy':
       pipeline = pipeline
-        .clahe({ width: 4, height: 4, maxSlope: 4 })
+        .normalize()
         .modulate({ saturation: 1.85, brightness: 0.94 })
-        .tint({ r: 180, g: 162, b: 255 })
-        .linear(1.14, -0.06);
+        .tint({ r: 180, g: 162, b: 255 });
       break;
 
-    // Electric cyan neon, very high contrast, punchy shadows.
+    // Electric cyan neon, high saturation, punchy contrast.
     case 'cyberpunk':
       pipeline = pipeline
-        .modulate({ saturation: 2.6, brightness: 0.80 })
+        .modulate({ saturation: 2.4, brightness: 0.82 })
         .tint({ r: 65, g: 190, b: 255 })
-        .sharpen({ sigma: 1.8, m1: 1.6, m2: 0.5 })
-        .linear(1.2, -0.09);
+        .sharpen({ sigma: 1.4, m1: 1.0, m2: 0.3 });
       break;
 
-    // Faded, soft, desaturated — lifted shadows, slight cool wash.
+    // Faded, soft, desaturated — lifted shadows, cool wash.
     case 'watercolor':
       pipeline = pipeline
         .modulate({ saturation: 0.48, brightness: 1.28 })
         .blur(1.4)
         .gamma(0.86)
-        .tint({ r: 248, g: 244, b: 255 })
-        .linear(0.9, 0.07);
+        .tint({ r: 248, g: 244, b: 255 });
       break;
 
     // Hyper-vivid, hard edges — cell-shaded cartoon feel.
     case 'anime':
       pipeline = pipeline
-        .clahe({ width: 6, height: 6, maxSlope: 5 })
-        .modulate({ saturation: 2.9, brightness: 1.13 })
-        .sharpen({ sigma: 2.8, m1: 2.4, m2: 0.2 })
-        .linear(1.13, -0.05);
+        .normalize()
+        .modulate({ saturation: 2.6, brightness: 1.1 })
+        .sharpen({ sigma: 2.0, m1: 1.8, m2: 0.2 });
       break;
 
-    // Warm amber/sienna, rich shadows, slight painterly blur.
+    // Warm amber/sienna, rich shadows, painterly blur.
     case 'oil-painting':
       pipeline = pipeline
         .modulate({ saturation: 1.45, brightness: 0.91 })
         .blur(0.8)
         .tint({ r: 255, g: 212, b: 148 })
-        .sharpen({ sigma: 0.6, m1: 0.5, m2: 0.2 })
-        .linear(1.14, -0.07);
+        .sharpen({ sigma: 0.6, m1: 0.4, m2: 0.2 });
       break;
   }
 
