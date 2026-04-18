@@ -45,6 +45,10 @@ export async function triggerEnhanceFace(jobId: string): Promise<void> {
   await api.post(`/api/enhance-face/${jobId}`);
 }
 
+export async function triggerApplyBg(jobId: string, color: string): Promise<void> {
+  await api.post(`/api/apply-bg/${jobId}`, { color });
+}
+
 export function getResultUrl(jobId: string): string {
   return `${BASE_URL}/api/result/${jobId}`;
 }

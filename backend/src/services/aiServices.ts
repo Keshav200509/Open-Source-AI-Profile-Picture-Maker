@@ -322,6 +322,27 @@ async function sharpStyle(
   await pipeline.jpeg({ quality: 94 }).toFile(outputPath);
 }
 
+// ─── Background Fill ─────────────────────────────────────────────────────────
+// Replaces transparent pixels (e.g. after rembg) with the given hex color.
+// On opaque images the flatten is a no-op — the result is the same image,
+// which is correct: the user should remove the background first.
+
+export async function applyBackground(
+  inputPath: string,
+  outputPath: string,
+  hexColor: string,
+): Promise<void> {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+
+  await sharp(inputPath)
+    .flatten({ background: { r, g, b } })
+    .jpeg({ quality: 95 })
+    .toFile(outputPath);
+}
+
 // ─── Processing mode ──────────────────────────────────────────────────────────
 
 export function getProcessingMode(): 'replicate' | 'huggingface' | 'local' | 'sharp' {

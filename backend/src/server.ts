@@ -16,6 +16,7 @@ import removeBgRouter from './routes/removeBg';
 import applyStyleRouter from './routes/applyStyle';
 import enhanceFaceRouter from './routes/enhanceFace';
 import resultRouter from './routes/result';
+import applyBgRouter from './routes/applyBg';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/remove-bg', removeBgRouter);
 app.use('/api/apply-style', applyStyleRouter);
 app.use('/api/enhance-face', enhanceFaceRouter);
 app.use('/api/result', resultRouter);
+app.use('/api/apply-bg', applyBgRouter);
 
 // Manual cleanup trigger (for external cron)
 app.post('/api/cleanup', (_req, res) => {
