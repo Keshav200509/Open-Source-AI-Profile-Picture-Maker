@@ -2,10 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   uploadImage,
   getStatus,
-  triggerRemoveBg,
   triggerApplyStyle,
   triggerEnhanceFace,
-  triggerApplyBg,
   getResultUrl,
   fetchMode,
   ProcessingMode,
@@ -14,7 +12,6 @@ import { JobStatus, StylePreset } from '../types';
 import UploadArea from '../components/UploadArea';
 import EditorCanvas from '../components/EditorCanvas';
 import StyleSelector from '../components/StyleSelector';
-import BackgroundTool from '../components/BackgroundTool';
 import StatusIndicator from '../components/StatusIndicator';
 import DownloadButton from '../components/DownloadButton';
 
@@ -86,9 +83,7 @@ export default function Home() {
     }
   }
 
-  const handleRemoveBg    = () => void handleAction(() => triggerRemoveBg(jobId!));
   const handleEnhanceFace = () => void handleAction(() => triggerEnhanceFace(jobId!));
-  const handleApplyBg     = (color: string) => void handleAction(() => triggerApplyBg(jobId!, color));
 
   function handleApplyStyle() {
     if (!selectedStyle) { setBannerError('Please select a style preset first.'); return; }
@@ -157,30 +152,30 @@ export default function Home() {
             {/* Hero */}
             <div className="text-center max-w-xl">
               <h2 className="text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
-                Turn any photo into a{' '}
-                <span className="bg-gradient-to-r from-brand-500 to-blue-600 bg-clip-text text-transparent">
-                  professional portrait
+                Transform your photo into{' '}
+                <span className="bg-gradient-to-r from-brand-500 to-violet-600 bg-clip-text text-transparent">
+                  stunning AI portraits
                 </span>
               </h2>
               <p className="mt-3 text-base text-gray-500 leading-relaxed">
-                Remove backgrounds, apply cinematic styles, and enhance face quality
-                — all powered by open-source AI. No account required.
+                Professional, Fantasy, Cyberpunk, Anime — four signature styles, powered by
+                open-source AI. No account required.
               </p>
             </div>
 
             <UploadArea onUpload={handleUpload} isUploading={isUploading} />
 
-            {/* Feature pills */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-xl">
+            {/* Style preview pills */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl">
               {[
-                { icon: '✂️', title: 'Remove Background', desc: 'Powered by rembg AI' },
-                { icon: '🎨', title: '7 Style Presets',   desc: 'Cyberpunk · Anime · Oil' },
-                { icon: '✨', title: 'Face Enhance',      desc: 'GFPGAN super-resolution' },
+                { icon: '💼', label: 'Professional', color: 'from-slate-100 to-blue-100',   border: 'border-slate-200' },
+                { icon: '🔮', label: 'Fantasy',      color: 'from-purple-100 to-violet-100', border: 'border-purple-200' },
+                { icon: '⚡', label: 'Cyberpunk',    color: 'from-cyan-100 to-slate-100',    border: 'border-cyan-200' },
+                { icon: '✨', label: 'Anime',        color: 'from-pink-100 to-orange-100',   border: 'border-pink-200' },
               ].map((f) => (
-                <div key={f.title} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center text-center gap-1">
-                  <span className="text-2xl">{f.icon}</span>
-                  <span className="font-semibold text-sm text-gray-800">{f.title}</span>
-                  <span className="text-xs text-gray-400">{f.desc}</span>
+                <div key={f.label} className={`bg-gradient-to-br ${f.color} rounded-2xl p-4 border ${f.border} flex flex-col items-center text-center gap-1`}>
+                  <span className="text-3xl">{f.icon}</span>
+                  <span className="font-bold text-sm text-gray-800">{f.label}</span>
                 </div>
               ))}
             </div>
@@ -193,7 +188,6 @@ export default function Home() {
         {screen === 'editor' && originalUrl && (
           <div className="flex flex-col gap-6">
 
-            {/* Canvas + status row */}
             <EditorCanvas originalUrl={originalUrl} resultUrl={resultUrl} />
 
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -204,29 +198,18 @@ export default function Home() {
             {/* Controls card */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-100">
 
-              {/* Section: Quick actions */}
-              <div className="p-5 flex flex-col gap-3">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Quick Actions</p>
-                <div className="flex flex-wrap gap-2.5">
-                  <ActionBtn onClick={handleRemoveBg} disabled={isProcessing} icon="✂️" label="Remove Background" />
-                  <ActionBtn onClick={handleEnhanceFace} disabled={isProcessing} icon="✨" label="Enhance Face" />
-                </div>
-                {mode === 'sharp' && (
-                  <p className="text-[11px] text-amber-600">
-                    ⚡ Background removal needs HF_API_TOKEN or REPLICATE_API_TOKEN. Enhance Face applies sharpening + 1.5× upscale.
-                  </p>
-                )}
-              </div>
-
               {/* Section: Style presets */}
-              <div className="p-5 flex flex-col gap-3">
+              <div className="p-5 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Style Presets</p>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Choose a Style</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Select a style then tap Apply</p>
+                  </div>
                   {selectedStyle && (
                     <button
                       onClick={handleApplyStyle}
                       disabled={isProcessing}
-                      className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >
                       🎨 Apply Style
                     </button>
@@ -235,11 +218,19 @@ export default function Home() {
                 <StyleSelector selected={selectedStyle} onSelect={setSelectedStyle} disabled={isProcessing} aiMode={mode !== 'sharp'} />
               </div>
 
-              {/* Section: Background fill */}
-              <div className="p-5 flex flex-col gap-3">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Background Fill</p>
-                <p className="text-xs text-gray-400 -mt-1">Best used after removing the background first.</p>
-                <BackgroundTool onApplyColor={handleApplyBg} disabled={isProcessing} />
+              {/* Section: Enhance */}
+              <div className="p-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Enhance Portrait</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Sharpen details, upscale resolution, correct tone</p>
+                </div>
+                <button
+                  onClick={handleEnhanceFace}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-brand-400 hover:bg-brand-50 rounded-xl text-sm font-semibold text-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
+                >
+                  ✨ Enhance
+                </button>
               </div>
 
             </div>
@@ -247,20 +238,5 @@ export default function Home() {
         )}
       </main>
     </div>
-  );
-}
-
-/* Shared action button used in the controls card */
-function ActionBtn({ onClick, disabled, icon, label }: {
-  onClick: () => void; disabled: boolean; icon: string; label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-brand-400 hover:bg-brand-50 rounded-lg text-sm font-medium text-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-    >
-      {icon} {label}
-    </button>
   );
 }

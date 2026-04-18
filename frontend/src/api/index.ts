@@ -29,10 +29,6 @@ export async function getStatus(jobId: string): Promise<StatusResponse> {
   return res.data.data!;
 }
 
-export async function triggerRemoveBg(jobId: string): Promise<void> {
-  await api.post(`/api/remove-bg/${jobId}`);
-}
-
 export async function triggerApplyStyle(
   jobId: string,
   style: StylePreset,
@@ -43,10 +39,6 @@ export async function triggerApplyStyle(
 
 export async function triggerEnhanceFace(jobId: string): Promise<void> {
   await api.post(`/api/enhance-face/${jobId}`);
-}
-
-export async function triggerApplyBg(jobId: string, color: string): Promise<void> {
-  await api.post(`/api/apply-bg/${jobId}`, { color });
 }
 
 export function getResultUrl(jobId: string): string {

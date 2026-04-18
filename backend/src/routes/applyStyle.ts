@@ -6,12 +6,9 @@ import { StylePreset } from '../types';
 
 const VALID_STYLES: StylePreset[] = [
   'professional',
-  'casual',
   'fantasy',
   'cyberpunk',
-  'watercolor',
   'anime',
-  'oil-painting',
 ];
 
 const router = Router();
