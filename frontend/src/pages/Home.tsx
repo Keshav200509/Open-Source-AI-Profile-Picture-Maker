@@ -211,6 +211,11 @@ export default function Home() {
                   <ActionBtn onClick={handleRemoveBg} disabled={isProcessing} icon="✂️" label="Remove Background" />
                   <ActionBtn onClick={handleEnhanceFace} disabled={isProcessing} icon="✨" label="Enhance Face" />
                 </div>
+                {mode === 'sharp' && (
+                  <p className="text-[11px] text-amber-600">
+                    ⚡ Background removal needs HF_API_TOKEN or REPLICATE_API_TOKEN. Enhance Face applies sharpening + 1.5× upscale.
+                  </p>
+                )}
               </div>
 
               {/* Section: Style presets */}
@@ -227,7 +232,7 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-                <StyleSelector selected={selectedStyle} onSelect={setSelectedStyle} disabled={isProcessing} />
+                <StyleSelector selected={selectedStyle} onSelect={setSelectedStyle} disabled={isProcessing} aiMode={mode !== 'sharp'} />
               </div>
 
               {/* Section: Background fill */}
