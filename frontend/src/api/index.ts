@@ -49,7 +49,7 @@ export function getResultUrl(jobId: string): string {
   return `${BASE_URL}/api/result/${jobId}`;
 }
 
-export type ProcessingMode = 'replicate' | 'local' | 'sharp';
+export type ProcessingMode = 'replicate' | 'huggingface' | 'local' | 'sharp';
 
 export async function fetchMode(): Promise<ProcessingMode> {
   try {

@@ -3,6 +3,7 @@ import path from 'path';
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   replicateApiToken: process.env.REPLICATE_API_TOKEN || '',
+  hfApiToken: process.env.HF_API_TOKEN || '',
   rembgApiUrl: process.env.REMBG_API_URL || '',
   gfpganApiUrl: process.env.GFPGAN_API_URL || '',
   stableDiffusionUrl: process.env.STABLE_DIFFUSION_URL || '',
