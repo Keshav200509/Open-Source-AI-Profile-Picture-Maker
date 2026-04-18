@@ -1,19 +1,27 @@
 services:
   - type: web
     name: ai-profile-backend
-    runtime: docker
-    # Root Dockerfile builds the Node.js backend into a slim Alpine image.
-    # No AI containers — all transformations run in mock mode on free tier.
+    runtime: node
     region: oregon
     plan: free
+    buildCommand: cd backend && npm ci --include=dev && npm run build && cd ../frontend && npm ci && npm run build
+    startCommand: node backend/dist/server.js
     healthCheckPath: /health
     envVars:
-      # PORT is injected automatically by Render.
+      # PORT is injected automatically by Render — do not set it here.
+
+      # ── Tier 1: Replicate cloud AI ──────────────────────────────────────────
+      # Add your token from https://replicate.com to enable full AI processing.
+      # Without it the app falls back to sharp image enhancement automatically.
+      - key: REPLICATE_API_TOKEN
+        value: ""
+
       - key: CLEANUP_INTERVAL_MS
         value: 3600000
       - key: MAX_FILE_SIZE_MB
         value: 10
-      # Leave blank for mock mode. Point at real GPU containers to enable AI.
+
+      # ── Tier 2: Self-hosted GPU containers (optional) ──────────────────────
       - key: REMBG_API_URL
         value: ""
       - key: GFPGAN_API_URL

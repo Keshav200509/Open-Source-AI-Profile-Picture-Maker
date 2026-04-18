@@ -9,6 +9,7 @@ import { config } from './config';
 import { ensureTempDir } from './services/storage';
 import { initJobStore } from './services/jobStore';
 import { startCleanupScheduler, runCleanup } from './services/cleanup';
+import { getProcessingMode } from './services/aiServices';
 import uploadRouter from './routes/upload';
 import statusRouter from './routes/status';
 import removeBgRouter from './routes/removeBg';
@@ -44,6 +45,11 @@ app.post('/api/cleanup', (_req, res) => {
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Processing mode — lets the frontend show which tier is active
+app.get('/api/mode', (_req, res) => {
+  res.json({ success: true, data: { mode: getProcessingMode() } });
 });
 
 // Serve React frontend — must be registered after all API routes
