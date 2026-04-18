@@ -32,9 +32,10 @@ export default function Home() {
 
   const startPolling = useCallback((id: string) => {
     stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await getStatus(id);
+    pollRef.current = setInterval(() => {
+      // Detach the async work so the setInterval callback returns immediately,
+      // preventing browser "long task" / Violation warnings.
+      void getStatus(id).then((data) => {
         setJobStatus(data.status);
         setJobError(data.error ?? null);
         if (data.status === 'completed') {
@@ -43,9 +44,9 @@ export default function Home() {
         } else if (data.status === 'failed') {
           stopPolling();
         }
-      } catch {
+      }).catch(() => {
         // network blip — keep polling
-      }
+      });
     }, 2000);
   }, []);
 

@@ -3,6 +3,8 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import { config } from './config';
 import { ensureTempDir } from './services/storage';
 import { initJobStore } from './services/jobStore';
@@ -43,6 +45,15 @@ app.post('/api/cleanup', (_req, res) => {
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Serve React frontend — must be registered after all API routes
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.listen(config.port, () => {
   console.log(`Backend running on http://localhost:${config.port}`);
