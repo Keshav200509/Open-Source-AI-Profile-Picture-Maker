@@ -16,6 +16,11 @@ services:
       - key: REPLICATE_API_TOKEN
         value: ""
 
+      # ── Tier 1.5: HuggingFace Inference API (free AI — Real-ESRGAN) ───────────
+      # Get a free token at https://huggingface.co/settings/tokens
+      - key: HF_API_TOKEN
+        value: ""
+
       - key: CLEANUP_INTERVAL_MS
         value: 3600000
       - key: MAX_FILE_SIZE_MB

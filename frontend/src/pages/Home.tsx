@@ -129,9 +129,10 @@ export default function Home() {
   const isProcessing = jobStatus === 'processing';
 
   const MODE_BADGE: Record<ProcessingMode, { label: string; color: string; dot: string }> = {
-    replicate: { label: 'AI · Replicate', color: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
-    local:     { label: 'AI · Local GPU', color: 'bg-blue-50 text-blue-700 border-blue-200',   dot: 'bg-blue-500'  },
-    sharp:     { label: 'Enhance Mode',   color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
+    replicate:    { label: 'AI · Replicate',    color: 'bg-green-50 text-green-700 border-green-200',   dot: 'bg-green-500'  },
+    huggingface:  { label: 'AI · HuggingFace',  color: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+    local:        { label: 'AI · Local GPU',     color: 'bg-blue-50 text-blue-700 border-blue-200',     dot: 'bg-blue-500'   },
+    sharp:        { label: 'Enhance Mode',       color: 'bg-amber-50 text-amber-700 border-amber-200',  dot: 'bg-amber-400'  },
   };
   const badge = MODE_BADGE[mode];
 
