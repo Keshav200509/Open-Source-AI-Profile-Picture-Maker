@@ -6,6 +6,8 @@ import {
   triggerApplyStyle,
   triggerEnhanceFace,
   getResultUrl,
+  fetchMode,
+  ProcessingMode,
 } from '../api';
 import { JobStatus, StylePreset } from '../types';
 import UploadArea from '../components/UploadArea';
@@ -27,8 +29,11 @@ export default function Home() {
   const [selectedStyle, setSelectedStyle] = useState<StylePreset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ProcessingMode>('sharp');
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => { void fetchMode().then(setMode); }, []);
 
   const startPolling = useCallback((id: string) => {
     stopPolling();
@@ -123,6 +128,13 @@ export default function Home() {
 
   const isProcessing = jobStatus === 'processing';
 
+  const MODE_BADGE: Record<ProcessingMode, { label: string; color: string; dot: string }> = {
+    replicate: { label: 'AI · Replicate', color: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
+    local:     { label: 'AI · Local GPU', color: 'bg-blue-50 text-blue-700 border-blue-200',   dot: 'bg-blue-500'  },
+    sharp:     { label: 'Enhance Mode',   color: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
+  };
+  const badge = MODE_BADGE[mode];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Header */}
@@ -135,14 +147,17 @@ export default function Home() {
               <p className="text-xs text-gray-500">Open-source · No account needed · Free</p>
             </div>
           </div>
-          {screen === 'editor' && (
-            <button
-              onClick={handleStartOver}
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-            >
-              Start Over
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <span className={`hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${badge.color}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+              {badge.label}
+            </span>
+            {screen === 'editor' && (
+              <button onClick={handleStartOver} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                Start Over
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

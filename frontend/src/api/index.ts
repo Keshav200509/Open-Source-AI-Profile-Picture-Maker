@@ -48,3 +48,14 @@ export async function triggerEnhanceFace(jobId: string): Promise<void> {
 export function getResultUrl(jobId: string): string {
   return `${BASE_URL}/api/result/${jobId}`;
 }
+
+export type ProcessingMode = 'replicate' | 'local' | 'sharp';
+
+export async function fetchMode(): Promise<ProcessingMode> {
+  try {
+    const res = await api.get<{ success: boolean; data: { mode: ProcessingMode } }>('/api/mode');
+    return res.data.data!.mode;
+  } catch {
+    return 'sharp';
+  }
+}
